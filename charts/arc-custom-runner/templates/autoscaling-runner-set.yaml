@@ -1,0 +1,120 @@
+# =============================================================================
+# AutoScalingRunnerSet — the core ARC v2 custom resource
+# This tells the ARC controller to manage a pool of GitHub Actions runners
+# =============================================================================
+apiVersion: actions.github.com/v1alpha1
+kind: AutoScalingRunnerSet
+metadata:
+  name: {{ include "arc-custom-runner.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "arc-custom-runner.labels" . | nindent 4 }}
+spec:
+  githubConfigUrl: {{ required "githubConfigUrl is required" .Values.githubConfigUrl | quote }}
+  githubConfigSecret: {{ include "arc-custom-runner.fullname" . }}-github-secret
+
+  {{- if .Values.runnerGroup }}
+  runnerGroup: {{ .Values.runnerGroup | quote }}
+  {{- end }}
+
+  minRunners: {{ .Values.minRunners }}
+  maxRunners: {{ .Values.maxRunners }}
+
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "arc-custom-runner.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "arc-custom-runner.serviceAccountName" . }}
+
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      containers:
+        # ---- Main Runner Container (Azure CLI + Terraform) ----
+        - name: runner
+          image: "{{ .Values.runnerImage.repository }}:{{ .Values.runnerImage.tag }}"
+          imagePullPolicy: {{ .Values.runnerImage.pullPolicy }}
+          command: ["/home/runner/run.sh"]
+
+          {{- with .Values.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+
+          env:
+            - name: ACTIONS_RUNNER_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
+              value: "false"
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+
+          volumeMounts:
+            - name: work
+              mountPath: /home/runner/_work
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+
+        {{- if .Values.dockerInDocker.enabled }}
+        # ---- Docker-in-Docker Sidecar ----
+        - name: dind
+          image: "{{ .Values.dockerInDocker.image }}:{{ .Values.dockerInDocker.tag }}"
+          securityContext:
+            privileged: true
+          env:
+            - name: DOCKER_TLS_CERTDIR
+              value: ""
+          volumeMounts:
+            - name: work
+              mountPath: /home/runner/_work
+            - name: dind-storage
+              mountPath: /var/lib/docker
+          resources:
+            {{- toYaml .Values.dockerInDocker.resources | nindent 12 }}
+        {{- end }}
+
+      volumes:
+        - name: work
+          {{- if eq .Values.workVolume.type "emptyDir" }}
+          emptyDir:
+            sizeLimit: {{ .Values.workVolume.emptyDir.sizeLimit }}
+          {{- else if eq .Values.workVolume.type "pvc" }}
+          persistentVolumeClaim:
+            claimName: {{ include "arc-custom-runner.fullname" . }}-work
+          {{- end }}
+        {{- if .Values.dockerInDocker.enabled }}
+        - name: dind-storage
+          emptyDir: {}
+        {{- end }}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

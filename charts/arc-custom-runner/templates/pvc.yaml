@@ -1,0 +1,15 @@
+{{- if eq .Values.workVolume.type "pvc" }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "arc-custom-runner.fullname" . }}-work
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "arc-custom-runner.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    {{- toYaml .Values.workVolume.pvc.accessModes | nindent 4 }}
+  storageClassName: {{ .Values.workVolume.pvc.storageClassName | quote }}
+  resources:
+    {{- toYaml .Values.workVolume.pvc.resources | nindent 4 }}
+{{- end }}

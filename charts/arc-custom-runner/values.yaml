@@ -1,0 +1,124 @@
+# =============================================================================
+# Custom ARC Runner Scale Set — Default Values
+# =============================================================================
+
+# -- GitHub Configuration --
+# The GitHub repository or organization URL
+githubConfigUrl: ""
+
+# GitHub authentication — provide EITHER a PAT or GitHub App credentials
+githubConfigSecret:
+  # Personal Access Token
+  github_token: ""
+  # -- OR GitHub App --
+  # github_app_id: ""
+  # github_app_installation_id: ""
+  # github_app_private_key: ""
+
+# -- Runner Image --
+# Custom image with Azure CLI + Terraform pre-installed
+runnerImage:
+  repository: ""  # e.g., myacr.azurecr.io/actions-runner-custom
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+# -- Scaling --
+# minRunners: 0 means scale to zero — no pods when idle (cost savings)
+# maxRunners: caps how many concurrent jobs can run
+minRunners: 0
+maxRunners: 5
+
+# -- Runner Group (optional) --
+# If using runner groups in GitHub, specify the group name
+runnerGroup: ""
+
+# -- Runner Pod Resources --
+# Keep lean for cost savings; burstable limits allow brief spikes
+resources:
+  requests:
+    cpu: "250m"
+    memory: "512Mi"
+  limits:
+    cpu: "1500m"
+    memory: "3Gi"
+
+# -- Node Scheduling --
+# Target the runner node pool (spot instances)
+nodeSelector:
+  workload: github-runner
+
+tolerations:
+  # Tolerate the runner workload taint
+  - key: "workload"
+    operator: "Equal"
+    value: "github-runner"
+    effect: "NoSchedule"
+  # Tolerate Azure Spot instance taint
+  - key: "kubernetes.azure.com/scalesetpriority"
+    operator: "Equal"
+    value: "spot"
+    effect: "NoSchedule"
+
+affinity: {}
+
+# -- Extra Environment Variables --
+# Inject additional env vars into the runner container
+extraEnv: []
+  # - name: AZURE_SUBSCRIPTION_ID
+  #   value: "your-subscription-id"
+  # - name: ARM_CLIENT_ID
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: azure-sp-creds
+  #       key: client-id
+
+# -- Extra Volume Mounts --
+extraVolumeMounts: []
+
+# -- Extra Volumes --
+extraVolumes: []
+
+# -- Service Account --
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# -- Pod Annotations --
+podAnnotations: {}
+
+# -- Pod Security Context --
+podSecurityContext: {}
+
+# -- Container Security Context --
+containerSecurityContext: {}
+
+# -- Docker-in-Docker --
+# Enable if your workflows need to build Docker images
+dockerInDocker:
+  enabled: false
+  image: "docker:dind"
+  tag: "latest"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+
+# -- Work Volume --
+# Persistent or emptyDir volume for the runner work directory
+workVolume:
+  # Use emptyDir for ephemeral (cheaper, no PV needed)
+  type: "emptyDir"
+  emptyDir:
+    sizeLimit: "5Gi"
+  # -- OR use a PVC --
+  # type: "pvc"
+  # pvc:
+  #   storageClassName: "managed-csi"
+  #   accessModes: ["ReadWriteOnce"]
+  #   resources:
+  #     requests:
+  #       storage: "10Gi"

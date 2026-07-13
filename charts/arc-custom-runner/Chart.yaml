@@ -1,0 +1,12 @@
+apiVersion: v2
+name: arc-custom-runner
+description: Custom GitHub Actions Runner ScaleSet for ARC with Azure CLI + Terraform
+type: application
+version: 1.0.0
+appVersion: "0.10.1"
+keywords:
+  - github-actions
+  - actions-runner-controller
+  - self-hosted-runner
+  - azure
+  - terraform
