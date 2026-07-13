@@ -153,14 +153,21 @@ variable "github_app_id" {
 }
 
 variable "github_app_installation_id" {
-  description = "GitHub App Installation ID (found in org settings → Installed GitHub Apps)"
+  description = "GitHub App Installation ID (Settings → Applications → Installed GitHub Apps → Configure)"
   type        = string
   default     = ""
 }
 
 variable "github_app_private_key_path" {
-  description = "Path to the GitHub App private key PEM file"
+  description = "Path to the GitHub App private key PEM file (for local use)"
   type        = string
+  default     = ""
+}
+
+variable "github_app_private_key_base64" {
+  description = "Base64-encoded GitHub App private key (for CI/CD — set via TF_VAR_github_app_private_key_base64 secret)"
+  type        = string
+  sensitive   = true
   default     = ""
 }
 

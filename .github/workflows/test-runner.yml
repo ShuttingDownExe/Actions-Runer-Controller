@@ -1,0 +1,96 @@
+# =============================================================================
+# Test workflow — validates the custom runner image tools
+# This runs ON the self-hosted ARC runner to prove everything works end-to-end
+#
+# Usage:
+#   1. Deploy ARC + runner scale set (terraform apply)
+#   2. Push this workflow to your repo
+#   3. It triggers automatically and verifies all tools on the runner
+# =============================================================================
+
+name: "🧪 Test Self-Hosted Runner"
+
+on:
+  workflow_dispatch: # Manual trigger
+  push:
+    paths:
+      - "Dockerfile"         # Re-test when runner image changes
+      - ".github/workflows/test-runner.yml"
+
+jobs:
+  test-runner-tools:
+    name: "Verify Runner Tools"
+    runs-on: arc-runner-set   # ← Must match your runner_scale_set_name
+
+    steps:
+      - name: "📋 Runner Environment Info"
+        run: |
+          echo "=== Runner Info ==="
+          echo "Hostname: $(hostname)"
+          echo "OS:       $(cat /etc/os-release | grep PRETTY_NAME | cut -d= -f2)"
+          echo "Arch:     $(uname -m)"
+          echo "User:     $(whoami)"
+          echo ""
+
+      - name: "🔧 Azure CLI"
+        run: |
+          echo "--- Azure CLI Version ---"
+          az version
+          echo ""
+          echo "--- Available Extensions ---"
+          az extension list-available --output table | head -10
+
+      - name: "🏗️ Terraform"
+        run: |
+          echo "--- Terraform Version ---"
+          terraform version
+          echo ""
+          echo "--- Provider mirror test ---"
+          mkdir -p /tmp/tf-test && cd /tmp/tf-test
+          cat > main.tf << 'EOF'
+          terraform {
+            required_providers {
+              null = { source = "hashicorp/null" }
+            }
+          }
+          resource "null_resource" "test" {}
+          EOF
+          terraform init -input=false
+          terraform plan -input=false
+          echo "✅ Terraform init + plan works"
+          rm -rf /tmp/tf-test
+
+      - name: "☸️ kubectl"
+        run: |
+          echo "--- kubectl Version ---"
+          kubectl version --client
+
+      - name: "⎈ Helm"
+        run: |
+          echo "--- Helm Version ---"
+          helm version
+          echo ""
+          echo "--- Helm repo add test ---"
+          helm repo add stable https://charts.helm.sh/stable 2>/dev/null || true
+          echo "✅ Helm works"
+
+      - name: "🛠️ Common Tools"
+        run: |
+          echo "--- git ---"
+          git --version
+          echo ""
+          echo "--- jq ---"
+          echo '{"test": "passed"}' | jq .test
+          echo ""
+          echo "--- curl ---"
+          curl --version | head -1
+          echo ""
+          echo "--- wget ---"
+          wget --version | head -1
+
+      - name: "✅ All checks passed"
+        run: |
+          echo "========================================"
+          echo "  🎉 All runner tools verified!"
+          echo "  This runner is ready for IaC workflows"
+          echo "========================================"

@@ -6,10 +6,16 @@ locals {
   runner_image = var.custom_runner_image != "" ? var.custom_runner_image : "${azurerm_container_registry.acr.login_server}/actions-runner-custom:${var.runner_image_tag}"
 
   # Auth method: GitHub App (recommended) vs PAT (fallback)
-  use_github_app = var.github_app_id != "" && var.github_app_installation_id != "" && var.github_app_private_key_path != ""
-  use_pat        = var.github_pat != ""
+  # Private key can come from a file (local) or base64 variable (CI/CD)
+  has_private_key = var.github_app_private_key_path != "" || var.github_app_private_key_base64 != ""
+  use_github_app  = var.github_app_id != "" && var.github_app_installation_id != "" && local.has_private_key
+  use_pat         = var.github_pat != ""
 
-  github_app_private_key = local.use_github_app ? file(var.github_app_private_key_path) : ""
+  github_app_private_key = (
+    var.github_app_private_key_base64 != "" ? base64decode(var.github_app_private_key_base64) :
+    var.github_app_private_key_path != "" ? file(var.github_app_private_key_path) :
+    ""
+  )
 }
 
 # ------------------ Auth Validation ------------------
@@ -18,7 +24,7 @@ resource "terraform_data" "auth_validation" {
   lifecycle {
     precondition {
       condition     = local.use_github_app || local.use_pat
-      error_message = "You must provide either GitHub App credentials (github_app_id + github_app_installation_id + github_app_private_key_path) or a github_pat."
+      error_message = "You must provide either GitHub App credentials (github_app_id + github_app_installation_id + private key file/base64) or a github_pat."
     }
     precondition {
       condition     = !(local.use_github_app && local.use_pat)
